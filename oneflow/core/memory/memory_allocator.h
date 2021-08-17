@@ -36,6 +36,8 @@ class MemoryAllocator final {
 
   std::mutex deleters_mutex_;
   std::list<std::function<void()>> deleters_;
+
+  HashMap<int64_t, int64_t> device_id2size_;
 };
 
 class Blob;

@@ -44,12 +44,22 @@ void RegstMgr::AddPlan(const Plan& plan,
                        const HashMap<std::string, Blob*>& variable_op_name2eager_blob) {
   int64_t this_machine_id = GlobalProcessCtx::Rank();
 
+  // Debug Code:
+  int64_t chunk_size = 0;
+  HashMap<int64_t, int64_t> device_id2eager_tensor_size;
+  auto B2Mib = [](int64_t b) { return (b * 1.0 / 1000000.0); };
+
   HashMap<int64_t, char*> chunk_id2ptr;
   for (const ChunkProto& chunk : plan.block_chunk_list().chunk()) {
     if (chunk.machine_id() != this_machine_id) { continue; }
     if (chunk.mem_size() == 0) { continue; }
     char* chunk_ptr = Global<ChunkMgr>::Get()->FindOrCreateChunk(chunk);
     CHECK(chunk_id2ptr.emplace(chunk.chunk_id(), chunk_ptr).second);
+    if (chunk.mem_case().has_device_cuda_mem()) {
+      std::cout << "cclog: Lazy: In rank = " << this_machine_id
+                << " , device_id = " << chunk.mem_case().device_cuda_mem().device_id()
+                << " , chunk_size = " << B2Mib(chunk.mem_size()) << "M\n\n";
+    }
   }
 
   HashSet<int64_t> all_block_ids;
@@ -88,6 +98,11 @@ void RegstMgr::AddPlan(const Plan& plan,
         CHECK_GE(mem_block.mem_size(), var_blob->blob_desc().ByteSizeOfBlobBody());
         CHECK(mem_block_id2ptr_.emplace(mem_block_id, var_blob->ForceMutDptr<char>()).second);
         CHECK(mem_block.mem_case() == var_blob->mem_case());
+
+        if (mem_block.mem_case().has_device_cuda_mem()) {
+          device_id2eager_tensor_size[mem_block.mem_case().device_cuda_mem().device_id()] +=
+              mem_block.mem_size();
+        }
       }
     } else {
       int64_t zone_id = MemoryCaseUtil::GenMemZoneId(mem_block.mem_case());
@@ -101,10 +116,19 @@ void RegstMgr::AddPlan(const Plan& plan,
     }
   }
 
+  for (auto& pair : device_id2eager_tensor_size) {
+    std::cout << "cclog: Lazy: In rank = " << this_machine_id << " , device_id = " << pair.first
+              << " , eager_tensor_size = " << B2Mib(pair.second) << "M\n\n";
+  }
   for (auto& pair : zone_id2packed_chunk) {
     PackedChunkInfo* packed_chunk = &pair.second;
     char* ptr =
         Global<MemoryAllocator>::Get()->Allocate(packed_chunk->mem_case, packed_chunk->size);
+    if (packed_chunk->mem_case.has_device_cuda_mem()) {
+      std::cout << "cclog: Lazy: In rank = " << this_machine_id
+                << " , device_id = " << packed_chunk->mem_case.device_cuda_mem().device_id()
+                << " , disable_mem_shared_size = " << B2Mib(packed_chunk->size) << "M\n\n";
+    }
     // sort blocks as thrd id
     std::vector<const MemBlockProto*>* blocks = &(packed_chunk->blocks);
     std::sort(blocks->begin(), blocks->end(),

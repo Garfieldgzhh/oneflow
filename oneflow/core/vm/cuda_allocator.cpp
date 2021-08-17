@@ -19,6 +19,7 @@ limitations under the License.
 #include "oneflow/core/vm/cuda_allocator.h"
 #include "oneflow/core/device/cuda_util.h"
 #include <iostream>
+#include "oneflow/core/control/global_process_ctx.h"
 
 namespace oneflow {
 namespace vm {
@@ -200,6 +201,13 @@ bool CudaAllocator::AllocateBlockToExtendTotalMem(size_t aligned_size) {
   MarkPiece(piece);
 
   CHECK(mem_ptr2block_.emplace(mem_ptr, Block(piece)).second);
+
+  // debug code:
+  auto B2Mib = [](int64_t b) { return (b * 1.0 / 1000000.0); };
+  int64_t this_machine_id = GlobalProcessCtx::Rank();
+  std::cout << "cclog: vm::CudaAllocator: In rank = " << this_machine_id
+            << ", device_id = " << device_id_ << ", this = " << this
+            << ", Total memory size = " << B2Mib(total_memory_bytes_) << "M\n\n";
 
   return true;
 }

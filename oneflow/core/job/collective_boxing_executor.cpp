@@ -490,6 +490,8 @@ void NcclCollectiveBoxingExecutorBackend::AddPlan(
       }
     }
   }
+  auto B2Mib = [](int64_t b) { return (b * 1.0 / 1000000.0); };
+  int64_t this_machine_id = GlobalProcessCtx::Rank();
   int cuda_stream_greatest_priority;
   OF_CUDA_CHECK(cudaDeviceGetStreamPriorityRange(nullptr, &cuda_stream_greatest_priority));
   for (int64_t stream_id = 0; stream_id < num_streams_; ++stream_id) {
@@ -503,6 +505,9 @@ void NcclCollectiveBoxingExecutorBackend::AddPlan(
         OF_CUDA_CHECK(cudaStreamCreateWithPriority(&device_ctx->stream, cudaStreamNonBlocking,
                                                    cuda_stream_greatest_priority));
         OF_CUDA_CHECK(cudaMalloc(&device_ctx->fusion_buffer, fusion_threshold_));
+        std::cout << "  cclog: In Lazy CollectiveBoxingExecutor:: rank = " << this_machine_id
+                  << " , device_id = " << device_id
+                  << " , malloc cuda size = " << B2Mib(fusion_threshold_) << " M\n\n";
       }
     }
   }

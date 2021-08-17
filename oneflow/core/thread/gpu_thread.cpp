@@ -20,6 +20,7 @@ limitations under the License.
 #include "oneflow/core/graph/id_serialization.h"
 #include "oneflow/core/device/node_device_descriptor_manager.h"
 #include "oneflow/core/device/cuda_device_descriptor.h"
+#include "oneflow/core/control/global_process_ctx.h"
 
 namespace oneflow {
 
@@ -40,7 +41,10 @@ void SetAffinityByDevice(int64_t dev_id) {
 }  // namespace
 
 GpuThread::GpuThread(int64_t thrd_id, int64_t dev_id) {
+  const int64_t this_rank = GlobalProcessCtx::Rank();
   set_thrd_id(thrd_id);
+  std::cout << " cclog: GPU thread : in rank = " << this_rank << " , thrd_id = " << thrd_id
+            << " , device_id " << dev_id << "\n\n";
   mut_actor_thread() = std::thread([this, dev_id, thrd_id]() {
     SetAffinityByDevice(dev_id);
     OF_PROFILER_NAME_THIS_HOST_THREAD("GPU " + std::to_string(dev_id) + " Actor : ("

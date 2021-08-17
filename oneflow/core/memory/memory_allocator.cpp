@@ -21,6 +21,7 @@ limitations under the License.
 #include "oneflow/core/register/blob.h"
 #include "oneflow/core/common/tensor_buffer.h"
 #include "oneflow/core/record/record.pb.h"
+#include "oneflow/core/control/global_process_ctx.h"
 
 namespace oneflow {
 
@@ -29,7 +30,13 @@ void* MemoryAllocatorImpl::Allocate(MemoryCase mem_case, size_t size) {
   if (mem_case.has_host_mem()) {
     if (mem_case.host_mem().has_cuda_pinned_mem()) {
 #ifdef WITH_CUDA
+      CudaCurrentDeviceGuard guard(mem_case.host_mem().cuda_pinned_mem().device_id());
       NumaAwareCudaMallocHost(mem_case.host_mem().cuda_pinned_mem().device_id(), &ptr, size);
+
+      int64_t this_machine_id = GlobalProcessCtx::Rank();
+      int64_t device_id = mem_case.host_mem().cuda_pinned_mem().device_id();
+      std::cout << "cclog: Lazy MemoryAllocator: In rank = " << this_machine_id
+                << " , device_id = " << device_id << " , malloc host\n\n";
 #else
       UNIMPLEMENTED();
 #endif
@@ -97,6 +104,13 @@ char* MemoryAllocator::Allocate(MemoryCase mem_case, std::size_t size) {
 #else
     UNIMPLEMENTED();
 #endif
+    int64_t this_machine_id = GlobalProcessCtx::Rank();
+    auto B2Mib = [](int64_t b) { return (b * 1.0 / 1000000.0); };
+    int64_t device_id = mem_case.device_cuda_mem().device_id();
+    device_id2size_[device_id] += size;
+    std::cout << "cclog: Lazy MemoryAllocator: In rank = " << this_machine_id
+              << " , device_id = " << device_id
+              << " , total_mem_size = " << B2Mib(device_id2size_[device_id]) << "M\n\n";
   } else {
     UNIMPLEMENTED();
   }

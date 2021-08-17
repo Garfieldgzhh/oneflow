@@ -22,6 +22,7 @@ limitations under the License.
 #include "oneflow/core/job/global_for.h"
 #include "oneflow/core/job/global_for.h"
 #include "oneflow/core/framework/op_kernel.h"
+#include "oneflow/core/control/global_process_ctx.h"
 
 namespace oneflow {
 
@@ -333,17 +334,44 @@ cudnnHandle_t ManagedCudnnConvResource::cudnn_handle() {
 }
 
 void* ManagedCudnnConvResource::x_mut_dptr() {
-  if (x_dptr_ == nullptr) { OF_CUDA_CHECK(cudaMalloc(&x_dptr_, x_byte_size_)); }
+  if (x_dptr_ == nullptr) {
+    int device_id;
+    OF_CUDA_CHECK(cudaGetDevice(&device_id));
+    auto B2Mib = [](int64_t b) { return (b * 1.0 / 1000000.0); };
+    int64_t this_machine_id = GlobalProcessCtx::Rank();
+    std::cout << "cclog: ManagedCudnnConvResource: In rank = " << this_machine_id
+              << " , device_id = " << device_id
+              << " , Try to allocate mem size = " << B2Mib(x_byte_size_) << "M\n\n";
+    OF_CUDA_CHECK(cudaMalloc(&x_dptr_, x_byte_size_));
+  }
   return x_dptr_;
 }
 
 void* ManagedCudnnConvResource::w_mut_dptr() {
-  if (w_dptr_ == nullptr) { OF_CUDA_CHECK(cudaMalloc(&w_dptr_, w_byte_size_)); }
+  if (w_dptr_ == nullptr) {
+    int device_id;
+    OF_CUDA_CHECK(cudaGetDevice(&device_id));
+    auto B2Mib = [](int64_t b) { return (b * 1.0 / 1000000.0); };
+    int64_t this_machine_id = GlobalProcessCtx::Rank();
+    std::cout << "cclog: ManagedCudnnConvResource: In rank = " << this_machine_id
+              << " , device_id = " << device_id
+              << " , Try to allocate mem size = " << B2Mib(w_byte_size_) << "M\n\n";
+    OF_CUDA_CHECK(cudaMalloc(&w_dptr_, w_byte_size_));
+  }
   return w_dptr_;
 }
 
 void* ManagedCudnnConvResource::y_mut_dptr() {
-  if (y_dptr_ == nullptr) { OF_CUDA_CHECK(cudaMalloc(&y_dptr_, y_byte_size_)); }
+  if (y_dptr_ == nullptr) {
+    int device_id;
+    OF_CUDA_CHECK(cudaGetDevice(&device_id));
+    auto B2Mib = [](int64_t b) { return (b * 1.0 / 1000000.0); };
+    int64_t this_machine_id = GlobalProcessCtx::Rank();
+    std::cout << "cclog: ManagedCudnnConvResource: In rank = " << this_machine_id
+              << " , device_id = " << device_id
+              << " , Try to allocate mem size = " << B2Mib(y_byte_size_) << "M\n\n";
+    OF_CUDA_CHECK(cudaMalloc(&y_dptr_, y_byte_size_));
+  }
   return y_dptr_;
 }
 

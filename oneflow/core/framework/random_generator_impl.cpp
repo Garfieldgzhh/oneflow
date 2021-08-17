@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 #include "oneflow/core/framework/random_generator_impl.h"
+#include "oneflow/core/control/global_process_ctx.h"
 
 #ifdef WITH_CUDA
 #include "oneflow/core/device/cuda_util.h"
@@ -57,6 +58,13 @@ CUDAGeneratorImpl::CUDAGeneratorImpl(uint64_t seed, int device_index)
   OF_CUDA_CHECK(
       cudaMalloc(&curand_states_, max_block_num_ * max_thread_num_ * sizeof(curandState)));
   detail::InitCurandStates(seed, max_block_num_, max_thread_num_, curand_states_);
+  int device_id;
+  OF_CUDA_CHECK(cudaGetDevice(&device_id));
+  auto B2Mib = [](int64_t b) { return (b * 1.0 / 1000000.0); };
+  int64_t this_machine_id = GlobalProcessCtx::Rank();
+  std::cout << "cclog: CUDAGeneratorImpl: In rank = " << this_machine_id
+            << " , device_id = " << device_id << " , Try to allocate mem size = "
+            << B2Mib(max_block_num_ * max_thread_num_ * sizeof(curandState)) << "M\n\n";
 }
 
 CUDAGeneratorImpl::~CUDAGeneratorImpl() { OF_CUDA_CHECK(cudaFree(curand_states_)); }
