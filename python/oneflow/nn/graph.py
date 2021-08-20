@@ -202,6 +202,7 @@ class Graph(object):
             )
             self._eager_outputs = list_to_func_return(self._eager_outputs)
 
+            oneflow._oneflow_internal.eager.multi_client.Sync()
             # Register input/output/variable to _c_nn_graph
             flattened_eager_args = self._flatten_io("input", *args)
             self._c_nn_graph.register_input_op_names_and_tensors(
@@ -221,6 +222,7 @@ class Graph(object):
 
     def _run(self, *args):
         try:
+            oneflow._oneflow_internal.eager.multi_client.Sync()
             flattened_eager_args = self._flatten_io("input", *args)
             # oneflow._oneflow_internal.eager.multi_client.Sync() NOTE(chengcheng): Need Sync?
             oneflow._oneflow_internal.nn.graph.RunLazyNNGraph(
@@ -237,6 +239,7 @@ class Graph(object):
                 + sys_exc_error_msg()
             )
             raise
+        oneflow._oneflow_internal.eager.multi_client.Sync()
         return self._eager_outputs
 
     def __call__(self, *args):

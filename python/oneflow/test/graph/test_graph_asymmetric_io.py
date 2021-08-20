@@ -46,7 +46,6 @@ class TestConsistentAsymmetricGraph(oneflow.unittest.TestCase):
                 out2 = self.linear2(out1)
                 return out2
 
-
         class MyLocalModule(flow.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -67,7 +66,9 @@ class TestConsistentAsymmetricGraph(oneflow.unittest.TestCase):
         np_x = np.random.randn(5, 3)
         np_y = np.ones(3)
         local_x = flow.tensor(np_x, dtype=flow.float32)
-        consistent_x = local_x.to_consistent(placement=flow.placement("cuda", {0:[0, 1]}), sbp=Broadcast)
+        consistent_x = local_x.to_consistent(
+            placement=flow.placement("cuda", {0: [0, 1]}), sbp=Broadcast
+        )
         local_x = consistent_x.to_local().to("cpu")
         local_y = flow.tensor(np_y, dtype=flow.float32)
         local_out = my_local_module(local_x, local_y)
@@ -91,14 +92,23 @@ class TestConsistentAsymmetricGraph(oneflow.unittest.TestCase):
         print("graph_out: ", graph_out)
         print("graph_out numpy", graph_out.numpy())
         graph_local_out = graph_out.to_local()
-        print("graph_local_out in rank ", flow.distributed.get_rank(),  " is : ", graph_local_out)
-        if flow.distributed.get_rank() == 0 :
+        print(
+            "graph_local_out in rank ",
+            flow.distributed.get_rank(),
+            " is : ",
+            graph_local_out,
+        )
+        if flow.distributed.get_rank() == 0:
             test_case.assertTrue(graph_local_out.shape == ([]))
-        elif flow.distributed.get_rank() == 1 :
-            test_case.assertTrue(np.allclose(graph_local_out.numpy(),
-                local_out.numpy(), atol=1e-4, rtol=1e-4))
+        elif flow.distributed.get_rank() == 1:
+            test_case.assertTrue(
+                np.allclose(
+                    graph_local_out.numpy(), local_out.numpy(), atol=1e-4, rtol=1e-4
+                )
+            )
         else:
             test_case.assertTrue(False)
+
 
 if __name__ == "__main__":
     unittest.main()
