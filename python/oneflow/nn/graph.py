@@ -203,8 +203,13 @@ class Graph(object):
             self._eager_outputs = list_to_func_return(self._eager_outputs)
 
             # Register input/output/variable to _c_nn_graph
-            self._c_nn_graph.register_input_op_names(arg_op_names)
-            self._c_nn_graph.register_output_op_names(output_op_names)
+            flattened_eager_args = self._flatten_io("input", *args)
+            self._c_nn_graph.register_input_op_names_and_tensors(
+                arg_op_names, flattened_eager_args
+            )
+            self._c_nn_graph.register_output_op_names_and_tensors(
+                output_op_names, self._outputs_tensor_tuple
+            )
             self._c_nn_graph.register_variable_op_names_and_tensors(
                 state_op_names, self._states_tensor_tuple
             )

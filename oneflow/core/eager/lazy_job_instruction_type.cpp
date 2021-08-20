@@ -131,6 +131,7 @@ class RunLazyJobInstructionType final : public InstructionType {
     for (int i = 0; i < nn_graph->inputs_op_names().size(); ++i) {
       const auto& op_name = nn_graph->inputs_op_names().at(i);
       const auto* blob = &phy_instr_operand->inputs()->at(i)->blob();
+      CHECK(blob != nullptr);
       const auto& PushCb = [blob](int64_t of_blob_ptr) {
         OfBlob* of_blob = reinterpret_cast<OfBlob*>(of_blob_ptr);
         of_blob->mut_blob()->CopyHeaderFrom(of_blob->mut_device_ctx(), blob);
@@ -143,6 +144,7 @@ class RunLazyJobInstructionType final : public InstructionType {
     for (int i = 0; i < nn_graph->outputs_op_names().size(); ++i) {
       const auto& op_name = nn_graph->outputs_op_names().at(i);
       auto* mut_blob = phy_instr_operand->outputs()->at(i)->mut_blob();
+      CHECK(mut_blob != nullptr);
       const auto& PullCb = [mut_blob](int64_t of_blob_ptr) {
         OfBlob* of_blob = reinterpret_cast<OfBlob*>(of_blob_ptr);
         mut_blob->CopyHeaderFrom(of_blob->mut_device_ctx(), &of_blob->blob());

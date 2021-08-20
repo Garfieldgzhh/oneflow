@@ -53,13 +53,63 @@ const std::vector<std::string>& NNGraph::outputs_op_names() const { return outpu
 
 int64_t NNGraph::variable_op_size() const { return variable_op_name2eager_blob_.size(); }
 
-Maybe<void> NNGraph::RegisterInputOpNames(const std::vector<std::string>& input_op_names) {
-  input_op_names_.assign(input_op_names.begin(), input_op_names.end());
+const std::vector<bool>& NNGraph::input_phy_tensor_valid() const { return input_phy_tensor_valid_; }
+
+const std::vector<bool>& NNGraph::output_phy_tensor_valid() const {
+  return output_phy_tensor_valid_;
+}
+
+Maybe<void> NNGraph::RegisterInputOpNamesAndTensors(
+    const std::vector<std::string>& input_op_names,
+    const std::vector<std::shared_ptr<one::Tensor>>& input_tensors) {
+  CHECK_EQ_OR_RETURN(input_op_names.size(), input_tensors.size());
+  CHECK_OR_RETURN(input_op_names_.empty());
+  CHECK_OR_RETURN(input_phy_tensor_valid_.empty());
+  for (int32_t i = 0; i < input_op_names.size(); ++i) {
+    const std::string& input_op_name = input_op_names.at(i);
+    const std::shared_ptr<one::Tensor>& input = input_tensors.at(i);
+    Blob* input_local_blob = nullptr;
+    if (input->is_consistent()) {
+      const std::shared_ptr<one::MirroredTensor> local_input = JUST(input->cur_rank_phy_tensor());
+      input_local_blob = JUST(local_input->eager_blob_object())->mut_blob();
+    } else {
+      input_local_blob = JUST(input->eager_blob_object())->mut_blob();
+    }
+    input_phy_tensor_valid_.push_back(input_local_blob != nullptr);
+    if (input_local_blob) { input_op_names_.push_back(input_op_name); }
+  }
+  CHECK_LE_OR_RETURN(input_op_names_.size(), input_op_names.size());
+  CHECK_EQ_OR_RETURN(input_phy_tensor_valid_.size(), input_tensors.size());
+  int64_t valid_num = 0;
+  for (bool valid : input_phy_tensor_valid_) { valid_num += valid; }
+  CHECK_EQ_OR_RETURN(valid_num, input_op_names_.size());
   return Maybe<void>::Ok();
 }
 
-Maybe<void> NNGraph::RegisterOutputOpNames(const std::vector<std::string>& output_op_names) {
-  output_op_names_.assign(output_op_names.begin(), output_op_names.end());
+Maybe<void> NNGraph::RegisterOutputOpNamesAndTensors(
+    const std::vector<std::string>& output_op_names,
+    const std::vector<std::shared_ptr<one::Tensor>>& output_tensors) {
+  CHECK_EQ_OR_RETURN(output_op_names.size(), output_tensors.size());
+  CHECK_OR_RETURN(output_op_names_.empty());
+  CHECK_OR_RETURN(output_phy_tensor_valid_.empty());
+  for (int32_t i = 0; i < output_op_names.size(); ++i) {
+    const std::string& output_op_name = output_op_names.at(i);
+    const std::shared_ptr<one::Tensor>& output = output_tensors.at(i);
+    Blob* output_local_blob = nullptr;
+    if (output->is_consistent()) {
+      const std::shared_ptr<one::MirroredTensor> local_output = JUST(output->cur_rank_phy_tensor());
+      output_local_blob = JUST(local_output->eager_blob_object())->mut_blob();
+    } else {
+      output_local_blob = JUST(output->eager_blob_object())->mut_blob();
+    }
+    output_phy_tensor_valid_.push_back(output_local_blob != nullptr);
+    if (output_local_blob) { output_op_names_.push_back(output_op_name); }
+  }
+  CHECK_LE_OR_RETURN(output_op_names_.size(), output_op_names.size());
+  CHECK_EQ_OR_RETURN(output_phy_tensor_valid_.size(), output_tensors.size());
+  int64_t valid_num = 0;
+  for (bool valid : output_phy_tensor_valid_) { valid_num += valid; }
+  CHECK_EQ_OR_RETURN(valid_num, output_op_names_.size());
   return Maybe<void>::Ok();
 }
 
@@ -79,10 +129,12 @@ Maybe<void> NNGraph::RegisterVariableOpNamesAndTensors(
     } else {
       var_blob = JUST(var->eager_blob_object())->mut_blob();
     }
-    const std::string& var_name = variable_op_names.at(i);
-    CHECK_OR_RETURN(!var_name.empty());
-    CHECK_OR_RETURN(variable_op_name2eager_blob_.emplace(var_name, var_blob).second);
-    CHECK_OR_RETURN(variable_op_names_.insert(var_name).second);
+    if (var_blob) {
+      const std::string& var_name = variable_op_names.at(i);
+      CHECK_OR_RETURN(!var_name.empty());
+      CHECK_OR_RETURN(variable_op_name2eager_blob_.emplace(var_name, var_blob).second);
+      CHECK_OR_RETURN(variable_op_names_.insert(var_name).second);
+    }
   }
   return Maybe<void>::Ok();
 }
@@ -101,9 +153,11 @@ Maybe<void> NNGraph::RegisterFreeEagerTensorsToVariableOpNames() {
     } else {
       var_blob = JUST(var->eager_blob_object())->mut_blob();
     }
-    CHECK_OR_RETURN(!var_name.empty());
-    CHECK_OR_RETURN(variable_op_name2eager_blob_.emplace(var_name, var_blob).second);
-    CHECK_OR_RETURN(variable_op_names_.insert(var_name).second);
+    if (var_blob) {
+      CHECK_OR_RETURN(!var_name.empty());
+      CHECK_OR_RETURN(variable_op_name2eager_blob_.emplace(var_name, var_blob).second);
+      CHECK_OR_RETURN(variable_op_names_.insert(var_name).second);
+    }
   }
   return Maybe<void>::Ok();
 }
@@ -192,14 +246,21 @@ void NNGraph::CloseRuntimeBuffers() {
 namespace {
 
 Maybe<void> MakeEagerBlobObjectList(std::vector<std::shared_ptr<vm::EagerBlobObject>>* blob_list,
-                                    const one::TensorTuple& tensor_list) {
-  for (const auto& tensor : tensor_list) {
+                                    const one::TensorTuple& tensor_list,
+                                    const std::vector<bool>& phy_tensor_valid) {
+  CHECK_EQ_OR_RETURN(tensor_list.size(), phy_tensor_valid.size());
+  for (int32_t i = 0; i < tensor_list.size(); ++i) {
+    const auto& tensor = tensor_list.at(i);
+    bool is_valid = phy_tensor_valid.at(i);
     CHECK_OR_RETURN(tensor->is_eager());
+    std::shared_ptr<vm::EagerBlobObject> eager_blob_object;
     if (tensor->is_consistent()) {
-      blob_list->push_back(JUST(JUST(tensor->cur_rank_phy_tensor())->eager_blob_object()));
+      eager_blob_object = JUST(JUST(tensor->cur_rank_phy_tensor())->eager_blob_object());
     } else {
-      blob_list->push_back(JUST(tensor->eager_blob_object()));
+      eager_blob_object = JUST(tensor->eager_blob_object());
     }
+    CHECK_EQ_OR_RETURN(is_valid, (eager_blob_object->mut_blob() != nullptr));
+    if (is_valid) { blob_list->push_back(eager_blob_object); }
   }
   return Maybe<void>::Ok();
 }
@@ -209,19 +270,23 @@ Maybe<void> MakeEagerBlobObjectList(std::vector<std::shared_ptr<vm::EagerBlobObj
 Maybe<void> RunLazyNNGraph(const one::TensorTuple& inputs, const one::TensorTuple& outputs,
                            const one::TensorTuple& parameters,
                            const std::shared_ptr<NNGraph>& nn_graph) {
-  CHECK_EQ_OR_RETURN(inputs.size(), nn_graph->inputs_op_names().size());
-  CHECK_EQ_OR_RETURN(outputs.size(), nn_graph->outputs_op_names().size());
+  CHECK_EQ_OR_RETURN(inputs.size(), nn_graph->input_phy_tensor_valid().size());
+  CHECK_EQ_OR_RETURN(outputs.size(), nn_graph->output_phy_tensor_valid().size());
   // NOTE(chengcheng):
   //   parameters not used in RunLazyJobInstrucntion;
   //   the args: parameters is all variable tensor hold by nn.Graph
   //   but the NNGraph::variable_op_size may has FreeEagerTensor as sepcial variable op.
-  CHECK_LE_OR_RETURN(parameters.size(), nn_graph->variable_op_size());
+  // CHECK_LE_OR_RETURN(parameters.size(), nn_graph->variable_op_size());
   std::vector<std::shared_ptr<vm::EagerBlobObject>> input_blobs;
   std::vector<std::shared_ptr<vm::EagerBlobObject>> output_blobs;
   std::vector<std::shared_ptr<vm::EagerBlobObject>> var_blobs;
-  JUST(MakeEagerBlobObjectList(&input_blobs, inputs));
-  JUST(MakeEagerBlobObjectList(&output_blobs, outputs));
-  JUST(MakeEagerBlobObjectList(&var_blobs, parameters));
+  JUST(MakeEagerBlobObjectList(&input_blobs, inputs, nn_graph->input_phy_tensor_valid()));
+  JUST(MakeEagerBlobObjectList(&output_blobs, outputs, nn_graph->output_phy_tensor_valid()));
+  // NOTE(chengcheng):
+  //   parameters not used in RunLazyJobInstrucntion;
+  // JUST(MakeEagerBlobObjectList(&var_blobs, parameters));
+  CHECK_EQ_OR_RETURN(nn_graph->inputs_op_names().size(), input_blobs.size());
+  CHECK_EQ_OR_RETURN(nn_graph->outputs_op_names().size(), output_blobs.size());
   const auto& input_blob_list_ptr =
       std::make_shared<const std::vector<std::shared_ptr<vm::EagerBlobObject>>>(
           std::move(input_blobs));

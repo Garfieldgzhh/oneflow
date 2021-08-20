@@ -34,12 +34,18 @@ class NNGraph final : public NNGraphIf {
   ~NNGraph();
 
   const std::string& job_name() const { return name_; }
-  const std::vector<std::string>& inputs_op_names() const;
-  const std::vector<std::string>& outputs_op_names() const;
+  const std::vector<std::string>& inputs_op_names() const override;
+  const std::vector<std::string>& outputs_op_names() const override;
+  const std::vector<bool>& input_phy_tensor_valid() const;
+  const std::vector<bool>& output_phy_tensor_valid() const;
   int64_t variable_op_size() const;
 
-  Maybe<void> RegisterInputOpNames(const std::vector<std::string>& input_op_names);
-  Maybe<void> RegisterOutputOpNames(const std::vector<std::string>& output_op_names);
+  Maybe<void> RegisterInputOpNamesAndTensors(
+      const std::vector<std::string>& input_op_names,
+      const std::vector<std::shared_ptr<one::Tensor>>& input_tensors);
+  Maybe<void> RegisterOutputOpNamesAndTensors(
+      const std::vector<std::string>& output_op_names,
+      const std::vector<std::shared_ptr<one::Tensor>>& output_tensors);
   Maybe<void> RegisterVariableOpNamesAndTensors(
       const std::vector<std::string>& variable_op_names,
       const std::vector<std::shared_ptr<one::Tensor>>& variable_tensors);
@@ -54,6 +60,8 @@ class NNGraph final : public NNGraphIf {
   std::string name_;
   std::vector<std::string> input_op_names_;
   std::vector<std::string> output_op_names_;
+  std::vector<bool> input_phy_tensor_valid_;
+  std::vector<bool> output_phy_tensor_valid_;
   HashMap<std::string, Blob*> variable_op_name2eager_blob_;
   HashSet<std::string> variable_op_names_;
   Job job_;
