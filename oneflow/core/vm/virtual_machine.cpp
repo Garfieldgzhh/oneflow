@@ -370,8 +370,8 @@ void VirtualMachine::ForEachMutMirroredObject(
 RwMutexedObjectAccess* VirtualMachine::ConsumeMirroredObject(OperandAccessType access_type,
                                                              MirroredObject* mirrored_object,
                                                              Instruction* instruction) {
-  auto rw_mutexed_object_access = ObjectMsgPtr<RwMutexedObjectAccess>::New(
-      instruction, mirrored_object, access_type);
+  auto rw_mutexed_object_access =
+      ObjectMsgPtr<RwMutexedObjectAccess>::New(instruction, mirrored_object, access_type);
   instruction->mut_mirrored_object_id2access()->Insert(rw_mutexed_object_access.Mutable());
   instruction->mut_access_list()->PushBack(rw_mutexed_object_access.Mutable());
   mirrored_object->mut_rw_mutexed_object()->mut_access_list()->EmplaceBack(
@@ -565,9 +565,8 @@ void VirtualMachine::__Init__(const VmDesc& vm_desc) {
         StreamId stream_id;
         stream_id.__Init__(stream_desc->stream_type_id(),
                            this_start_global_device_id() + rel_global_device_id);
-        auto stream =
-            ObjectMsgPtr<Stream>::New(thread_ctx.Mutable(), stream_id,
-                                          vm_resource_desc().max_device_num_per_machine());
+        auto stream = ObjectMsgPtr<Stream>::New(thread_ctx.Mutable(), stream_id,
+                                                vm_resource_desc().max_device_num_per_machine());
         CHECK(stream_rt_desc->mut_stream_id2stream()->Insert(stream.Mutable()).second);
         thread_ctx->mut_stream_list()->PushBack(stream.Mutable());
       }

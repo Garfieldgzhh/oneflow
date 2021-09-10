@@ -98,8 +98,8 @@ class NewObjectInstructionType final : public InstructionType {
           *parallel_desc, vm->machine_id_range(), [&](int64_t machine_id, int64_t device_id) {
             int64_t global_device_id =
                 vm->vm_resource_desc().GetGlobalDeviceId(machine_id, device_id);
-            auto mirrored_object = ObjectMsgPtr<MirroredObject>::New(
-                logical_object.Mutable(), global_device_id);
+            auto mirrored_object =
+                ObjectMsgPtr<MirroredObject>::New(logical_object.Mutable(), global_device_id);
             CHECK(global_device_id2mirrored_object->Insert(mirrored_object.Mutable()).second);
           });
     }
@@ -155,8 +155,8 @@ class BroadcastObjectReferenceInstructionType final : public InstructionType {
         *parallel_desc, vm->machine_id_range(), [&](int64_t machine_id, int64_t device_id) {
           int64_t global_device_id =
               vm->vm_resource_desc().GetGlobalDeviceId(machine_id, device_id);
-          auto mirrored_object = ObjectMsgPtr<MirroredObject>::New(
-              logical_object.Mutable(), global_device_id);
+          auto mirrored_object =
+              ObjectMsgPtr<MirroredObject>::New(logical_object.Mutable(), global_device_id);
           mirrored_object->reset_rw_mutexed_object(*sole_rw_mutexed_object);
           CHECK(global_device_id2mirrored_object->Insert(mirrored_object.Mutable()).second);
         });

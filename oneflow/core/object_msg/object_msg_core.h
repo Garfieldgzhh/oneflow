@@ -114,26 +114,26 @@ namespace oneflow {
     *OF_PP_CAT(mutable_, OF_PP_PAIR_SECOND(pair))() = val;      \
   }
 
-#define OBJECT_MSG_MAKE_ONEOF_FIELD_MUTABLE(oneof_name, pair)                        \
- public:                                                                             \
-  OF_PP_PAIR_FIRST(pair) * OF_PP_CAT(mut_, OF_PP_PAIR_SECOND(pair))() {              \
-    auto* ptr = &OF_PP_CAT(oneof_name, _).OF_PP_CAT(OF_PP_PAIR_SECOND(pair), _);     \
-    using FieldType = typename std::remove_pointer<decltype(ptr)>::type;             \
-    static const bool is_ptr = std::is_pointer<FieldType>::value;                    \
-    CHECK(OF_PP_CAT(has_, OF_PP_PAIR_SECOND(pair))());                               \
-    return MutableTrait<is_ptr>::Call(ptr);                                          \
-  }                                                                                  \
-  OF_PP_PAIR_FIRST(pair) * OF_PP_CAT(mutable_, OF_PP_PAIR_SECOND(pair))() {          \
-    auto* ptr = &OF_PP_CAT(oneof_name, _).OF_PP_CAT(OF_PP_PAIR_SECOND(pair), _);     \
-    using FieldType = typename std::remove_pointer<decltype(ptr)>::type;             \
-    static const bool is_ptr = std::is_pointer<FieldType>::value;                    \
-    if (!OF_PP_CAT(has_, OF_PP_PAIR_SECOND(pair))()) {                               \
-      OF_PP_CAT(clear_, oneof_name)();                                               \
-      ObjectMsgNaiveInit<void, FieldType>::Call(nullptr, ptr); \
-      OF_PP_CAT(set_, OF_PP_CAT(oneof_name, _case))                                  \
-      (_OBJECT_MSG_ONEOF_ENUM_VALUE(OF_PP_PAIR_SECOND(pair)));                       \
-    }                                                                                \
-    return MutableTrait<is_ptr>::Call(ptr);                                          \
+#define OBJECT_MSG_MAKE_ONEOF_FIELD_MUTABLE(oneof_name, pair)                    \
+ public:                                                                         \
+  OF_PP_PAIR_FIRST(pair) * OF_PP_CAT(mut_, OF_PP_PAIR_SECOND(pair))() {          \
+    auto* ptr = &OF_PP_CAT(oneof_name, _).OF_PP_CAT(OF_PP_PAIR_SECOND(pair), _); \
+    using FieldType = typename std::remove_pointer<decltype(ptr)>::type;         \
+    static const bool is_ptr = std::is_pointer<FieldType>::value;                \
+    CHECK(OF_PP_CAT(has_, OF_PP_PAIR_SECOND(pair))());                           \
+    return MutableTrait<is_ptr>::Call(ptr);                                      \
+  }                                                                              \
+  OF_PP_PAIR_FIRST(pair) * OF_PP_CAT(mutable_, OF_PP_PAIR_SECOND(pair))() {      \
+    auto* ptr = &OF_PP_CAT(oneof_name, _).OF_PP_CAT(OF_PP_PAIR_SECOND(pair), _); \
+    using FieldType = typename std::remove_pointer<decltype(ptr)>::type;         \
+    static const bool is_ptr = std::is_pointer<FieldType>::value;                \
+    if (!OF_PP_CAT(has_, OF_PP_PAIR_SECOND(pair))()) {                           \
+      OF_PP_CAT(clear_, oneof_name)();                                           \
+      ObjectMsgNaiveInit<void, FieldType>::Call(nullptr, ptr);                   \
+      OF_PP_CAT(set_, OF_PP_CAT(oneof_name, _case))                              \
+      (_OBJECT_MSG_ONEOF_ENUM_VALUE(OF_PP_PAIR_SECOND(pair)));                   \
+    }                                                                            \
+    return MutableTrait<is_ptr>::Call(ptr);                                      \
   }
 
 #define OBJECT_MSG_MAKE_ONEOF_FIELD_RESETTER(oneof_name, pair)                     \
@@ -234,15 +234,15 @@ namespace oneflow {
     return default_object_msg.Get();                                                  \
   }
 
-#define OBJECT_MSG_DEFINE_BASE()                                                            \
- public:                                                                                    \
-  ObjectMsgBase* __mut_object_msg_base__() { return &__object_msg_base__; }                 \
-  int32_t ref_cnt() const { return __object_msg_base__.ref_cnt(); }                         \
-                                                                                            \
- private:                                                                                   \
-  ObjectMsgBase __object_msg_base__;                                                        \
-  OF_PRIVATE INCREASE_STATIC_COUNTER(field_counter);                                        \
-  DSS_DEFINE_FIELD(STATIC_COUNTER(field_counter), "object message", ObjectMsgBase,          \
+#define OBJECT_MSG_DEFINE_BASE()                                                   \
+ public:                                                                           \
+  ObjectMsgBase* __mut_object_msg_base__() { return &__object_msg_base__; }        \
+  int32_t ref_cnt() const { return __object_msg_base__.ref_cnt(); }                \
+                                                                                   \
+ private:                                                                          \
+  ObjectMsgBase __object_msg_base__;                                               \
+  OF_PRIVATE INCREASE_STATIC_COUNTER(field_counter);                               \
+  DSS_DEFINE_FIELD(STATIC_COUNTER(field_counter), "object message", ObjectMsgBase, \
                    __object_msg_base__);
 
 #define OBJECT_MSG_DEFINE_CONTAINER_ELEM_STRUCT()     \

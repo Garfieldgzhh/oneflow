@@ -61,8 +61,7 @@ class NewParallelDescSymbolInstructionType final : public InstructionType {
       CHECK(vm->mut_id2logical_object()->Insert(logical_object.Mutable()).second);
       auto* global_device_id2mirrored_object =
           logical_object->mut_global_device_id2mirrored_object();
-      auto mirrored_object =
-          ObjectMsgPtr<MirroredObject>::New(logical_object.Mutable(), 0);
+      auto mirrored_object = ObjectMsgPtr<MirroredObject>::New(logical_object.Mutable(), 0);
       {
         const auto& parallel_desc =
             Global<symbol::Storage<ParallelDesc>>::Get()->GetPtr(view->logical_object_id(i));
