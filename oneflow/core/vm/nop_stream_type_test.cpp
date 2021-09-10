@@ -26,7 +26,6 @@ limitations under the License.
 #include "oneflow/core/vm/virtual_machine.msg.h"
 #include "oneflow/core/vm/vm_desc.msg.h"
 #include "oneflow/core/vm/test_util.h"
-#include "oneflow/core/common/cached_object_msg_allocator.h"
 
 namespace oneflow {
 namespace vm {
@@ -40,9 +39,8 @@ ObjectMsgPtr<VirtualMachine> NaiveNewVirtualMachine(const VmDesc& vm_desc) {
 }
 
 std::function<ObjectMsgPtr<VirtualMachine>(const VmDesc&)> CachedAllocatorNewVirtualMachine() {
-  auto allocator = std::make_shared<CachedObjectMsgAllocator>(20, 100);
-  return [allocator](const VmDesc& vm_desc) -> ObjectMsgPtr<VirtualMachine> {
-    return ObjectMsgPtr<VirtualMachine>::NewFrom(allocator.get(), vm_desc);
+  return [](const VmDesc& vm_desc) -> ObjectMsgPtr<VirtualMachine> {
+    return ObjectMsgPtr<VirtualMachine>::New(vm_desc);
   };
 }
 
@@ -78,6 +76,10 @@ void TestNopStreamTypeNoArgument(
   auto* instruction = stream->mut_running_instruction_list()->Begin();
   ASSERT_TRUE(instruction != nullptr);
   ASSERT_EQ(instruction->mut_instr_msg(), nop_instr_msg.Mutable());
+  while (!vm->Empty()) {
+    vm->Schedule();
+    OBJECT_MSG_LIST_FOR_EACH_PTR(vm->mut_thread_ctx_list(), t) { t->TryReceiveAndRun(); }
+  }
 }
 
 TEST(NopStreamType, no_argument) {

@@ -45,7 +45,7 @@ const StreamTypeId& Stream::stream_type_id() const {
 ObjectMsgPtr<Instruction> Stream::NewInstruction(
     InstructionMsg* instr_msg, const std::shared_ptr<const ParallelDesc>& parallel_desc) {
   if (free_instruction_list().empty()) {
-    return ObjectMsgPtr<Instruction>::NewFrom(mut_allocator(), instr_msg, this, parallel_desc);
+    return ObjectMsgPtr<Instruction>::New(instr_msg, this, parallel_desc);
   }
   ObjectMsgPtr<Instruction> instruction = mut_free_instruction_list()->PopFront();
   instruction->__Init__(instr_msg, this, parallel_desc);
@@ -100,6 +100,14 @@ void Stream::DeleteInstruction(ObjectMsgPtr<Instruction>&& instruction) {
                     << proto.DebugString();
   }
   MoveFromZombieListToFreeList();
+}
+
+void Stream::__Delete__() {
+  if (running_instruction_list().size() > 0) {
+    const auto* instruction = mut_running_instruction_list()->Begin();
+    LOG(ERROR) << instruction->instr_msg().instr_type_name();
+  }
+  CHECK_EQ(running_instruction_list().size(), 0);
 }
 
 }  // namespace vm

@@ -129,7 +129,7 @@ namespace oneflow {
     static const bool is_ptr = std::is_pointer<FieldType>::value;                    \
     if (!OF_PP_CAT(has_, OF_PP_PAIR_SECOND(pair))()) {                               \
       OF_PP_CAT(clear_, oneof_name)();                                               \
-      ObjectMsgNaiveInit<ObjectMsgAllocator, FieldType>::Call(mut_allocator(), ptr); \
+      ObjectMsgNaiveInit<void, FieldType>::Call(nullptr, ptr); \
       OF_PP_CAT(set_, OF_PP_CAT(oneof_name, _case))                                  \
       (_OBJECT_MSG_ONEOF_ENUM_VALUE(OF_PP_PAIR_SECOND(pair)));                       \
     }                                                                                \
@@ -238,7 +238,6 @@ namespace oneflow {
  public:                                                                                    \
   ObjectMsgBase* __mut_object_msg_base__() { return &__object_msg_base__; }                 \
   int32_t ref_cnt() const { return __object_msg_base__.ref_cnt(); }                         \
-  ObjectMsgAllocator* mut_allocator() const { return __object_msg_base__.mut_allocator(); } \
                                                                                             \
  private:                                                                                   \
   ObjectMsgBase __object_msg_base__;                                                        \
@@ -317,32 +316,6 @@ struct ObjectMsgSelfType<
   using type = T;
 };
 
-class ObjectMsgAllocator {
- public:
-  virtual ~ObjectMsgAllocator() {}
-  virtual char* Allocate(std::size_t size) = 0;
-  virtual void Deallocate(char* ptr, std::size_t size) = 0;
-
- protected:
-  ObjectMsgAllocator() = default;
-};
-
-class ObjectMsgDefaultAllocator : public ObjectMsgAllocator {
- public:
-  ObjectMsgDefaultAllocator() = default;
-
-  static ObjectMsgDefaultAllocator* GlobalObjectMsgAllocator() {
-    static ObjectMsgDefaultAllocator* allocator = new ObjectMsgDefaultAllocator();
-    return allocator;
-  }
-
-  char* Allocate(std::size_t size) override { return allocator_.allocate(size); }
-  void Deallocate(char* ptr, std::size_t size) override { allocator_.deallocate(ptr, size); }
-
- private:
-  std::allocator<char> allocator_;
-};
-
 struct ObjectMsgPtrUtil;
 template<typename T>
 class ObjectMsgPtr;
@@ -355,23 +328,17 @@ struct ObjectMsgStruct {
 class ObjectMsgBase {
  public:
   int32_t ref_cnt() const { return ref_cnt_; }
-  ObjectMsgAllocator* mut_allocator() const { return allocator_; }
 
  private:
   friend struct ObjectMsgPtrUtil;
   void InitRefCount() { ref_cnt_ = 0; }
-  void set_allocator(ObjectMsgAllocator* allocator) { allocator_ = allocator; }
   void IncreaseRefCount() { ref_cnt_++; }
   int32_t DecreaseRefCount() { return --ref_cnt_; }
 
   std::atomic<int32_t> ref_cnt_;
-  ObjectMsgAllocator* allocator_;
 };
 
 struct ObjectMsgPtrUtil final {
-  static void SetAllocator(ObjectMsgBase* ptr, ObjectMsgAllocator* allocator) {
-    ptr->set_allocator(allocator);
-  }
   template<typename T>
   static void InitRef(T* ptr) {
     ptr->__mut_object_msg_base__()->InitRefCount();
@@ -385,9 +352,8 @@ struct ObjectMsgPtrUtil final {
     CHECK_NOTNULL(ptr);
     int32_t ref_cnt = ptr->__mut_object_msg_base__()->DecreaseRefCount();
     if (ref_cnt > 0) { return; }
-    auto* allocator = ptr->mut_allocator();
     ptr->ObjectMsg__Delete__();
-    allocator->Deallocate(reinterpret_cast<char*>(ptr), sizeof(T));
+    delete ptr;
   }
 };
 
@@ -446,12 +412,10 @@ struct _ObjectMsgNaiveInit<true> {
     using FieldType = typename std::remove_pointer<PtrFieldType>::type;
     static_assert(std::is_base_of<ObjectMsgStruct, FieldType>::value,
                   "FieldType is not a subclass of ObjectMsgStruct");
-    char* mem_ptr = ctx->Allocate(sizeof(FieldType));
-    auto* ptr = new (mem_ptr) FieldType();
+    auto* ptr = new FieldType();
     *field_ptr = ptr;
     std::memset(reinterpret_cast<void*>(ptr), 0, sizeof(FieldType));
     ObjectMsgPtrUtil::InitRef<FieldType>(ptr);
-    ObjectMsgPtrUtil::SetAllocator(ptr->__mut_object_msg_base__(), ctx);
     ObjectMsgPtrUtil::Ref<FieldType>(ptr);
     ptr->template ObjectMsg__Init__<WalkCtxType>(ctx);
   }
@@ -527,13 +491,8 @@ class ObjectMsgPtr final {
 
   template<typename... Args>
   static ObjectMsgPtr New(Args&&... args) {
-    return NewFrom(ObjectMsgDefaultAllocator::GlobalObjectMsgAllocator(),
-                   std::forward<Args>(args)...);
-  }
-  template<typename... Args>
-  static ObjectMsgPtr NewFrom(ObjectMsgAllocator* allocator, Args&&... args) {
     ObjectMsgPtr ret;
-    ObjectMsgNaiveInit<ObjectMsgAllocator, value_type*>::Call(allocator, &ret.ptr_);
+    ObjectMsgNaiveInit<void, value_type*>::Call(nullptr, &ret.ptr_);
     ret.Mutable()->__Init__(std::forward<Args>(args)...);
     return ret;
   }

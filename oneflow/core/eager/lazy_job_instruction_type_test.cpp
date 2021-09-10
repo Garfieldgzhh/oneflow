@@ -88,10 +88,10 @@ TEST(RunLazyJobInstructionType, simple) {
   InstructionMsgList list;
   vm::cfg::EagerSymbolList eager_symbol_list;
   InstructionsBuilder instructions_builder(nullptr, &list, &eager_symbol_list);
+  const auto& nn_graph = std::make_shared<NoArgNoRetMockNNGraph>(job_name);
   {
     static const auto& empty_list =
         std::make_shared<const std::vector<std::shared_ptr<vm::EagerBlobObject>>>();
-    const auto& nn_graph = std::make_shared<NoArgNoRetMockNNGraph>(job_name);
     CHECK_JUST(instructions_builder.RunLazyJob(empty_list, empty_list, empty_list, nn_graph));
     CHECK_JUST(instructions_builder.RunLazyJob(empty_list, empty_list, empty_list, nn_graph));
   }
@@ -172,11 +172,11 @@ TEST(RunLazyJobInstructionType, wait_for_another_job_finished) {
   InstructionsBuilder instructions_builder(nullptr, &list, &eager_symbol_list);
   int num_job0_instance = 2;
   int num_job1_instance = 3;
+  const auto& nn_graph0 = std::make_shared<NoArgNoRetMockNNGraph>(job_name0);
+  const auto& nn_graph1 = std::make_shared<NoArgNoRetMockNNGraph>(job_name1);
   {
     static const auto& empty_list =
         std::make_shared<const std::vector<std::shared_ptr<vm::EagerBlobObject>>>();
-    const auto& nn_graph0 = std::make_shared<NoArgNoRetMockNNGraph>(job_name0);
-    const auto& nn_graph1 = std::make_shared<NoArgNoRetMockNNGraph>(job_name1);
     for (int i = 0; i < num_job0_instance; ++i) {
       CHECK_JUST(instructions_builder.RunLazyJob(empty_list, empty_list, empty_list, nn_graph0));
     }

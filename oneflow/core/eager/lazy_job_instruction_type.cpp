@@ -161,7 +161,10 @@ class RunLazyJobInstructionType final : public InstructionType {
       };
       CHECK(pull_cbs.emplace(op_name, PullCb).second);
     }
-    const auto& FinishCb = [this, instruction]() {
+    const auto& finished = std::make_shared<bool>(false);
+    const auto& FinishCb = [this, instruction, finished]() {
+      CHECK(!*finished);
+      *finished = true;
       auto* device_ctx = GetLazyJobDeviceCtx(instruction);
       device_ctx->DequeueNNGraph();
       auto* status_buffer = instruction->mut_status_buffer();

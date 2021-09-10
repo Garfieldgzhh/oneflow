@@ -67,10 +67,6 @@ class LazyJobDeviceCtx final : public DeviceCtx {
     return DeviceType::kInvalidDevice;
   }
 
-  std::queue<std::weak_ptr<NNGraphIf>>* mut_queue() { return &queue_; }
-  std::mutex* mut_mutex() { return &mutex_; }
-  std::condition_variable* mut_cond() { return &cond_; }
-
   void WaitUntilQueueEmptyIfFrontNNGraphNotEquals(const std::shared_ptr<NNGraphIf>& nn_graph) {
     std::unique_lock<std::mutex> lock(mutex_);
     if (queue_.empty()) { return; }
@@ -87,6 +83,7 @@ class LazyJobDeviceCtx final : public DeviceCtx {
 
   void DequeueNNGraph() {
     std::unique_lock<std::mutex> lock(mutex_);
+    CHECK(!queue_.empty());
     queue_.pop();
     cond_.notify_all();
   }
