@@ -103,11 +103,8 @@ void Stream::DeleteInstruction(ObjectMsgPtr<Instruction>&& instruction) {
 }
 
 void Stream::__Delete__() {
-  if (running_instruction_list().size() > 0) {
-    const auto* instruction = mut_running_instruction_list()->Begin();
-    LOG(ERROR) << instruction->instr_msg().instr_type_name();
-  }
-  CHECK_EQ(running_instruction_list().size(), 0);
+  CHECK_EQ(running_instruction_list().size(), 0)
+    << "running instruction: " << mut_running_instruction_list()->Begin()->instr_msg().instr_type_name();
 }
 
 }  // namespace vm
