@@ -34,6 +34,12 @@ def compare_with_tensorflow(
         np_labels = np.random.randint(0, num_classes, size=(batch_size,)).astype(np.int32)
         np_logits = np.random.random((batch_size, num_classes)).astype(np.float32)
 
+        with tf.GradientTape(persistent=True) as tape:
+            tf_logits = tf.Variable(np_logits)
+            tf_output = tf.nn.sparse_softmax_cross_entropy_with_logits(np_labels, tf_logits)
+        tf_logits_diff = tape.gradient(tf_output, tf_logits)
+
+        # test sparse_softmax_cross_entropy_with_logits
         of_logits = flow.tensor(np_logits, device=device_type, dtype=data_type, requires_grad=True)
         of_labels = flow.tensor(np_labels, device=device_type, dtype=label_type)
         of_output = flow.nn.functional.sparse_softmax_cross_entropy_with_logits(
@@ -41,15 +47,23 @@ def compare_with_tensorflow(
         ).to(device_type)
         of_output.sum().backward()
 
-        with tf.GradientTape(persistent=True) as tape:
-            tf_logits = tf.Variable(np_logits)
-            tf_output = tf.nn.sparse_softmax_cross_entropy_with_logits(np_labels, tf_logits)
-        tf_logits_diff = tape.gradient(tf_output, tf_logits)
-
         assert np.allclose(of_output.numpy(), tf_output.numpy(), rtol=1e-03, atol=1e-04)
         assert np.allclose(
             of_logits.grad.numpy(), tf_logits_diff.numpy(), rtol=1e-03, atol=1e-04
         )
+
+        # test distributed_sparse_softmax_cross_entropy_with_logits
+        of_logits = flow.tensor(np_logits, device=device_type, dtype=data_type, requires_grad=True)
+        of_labels = flow.tensor(np_labels, device=device_type, dtype=label_type)
+        of_output = flow.nn.functional.distributed_sparse_softmax_cross_entropy_with_logits(
+            labels=of_labels, logits=of_logits
+        ).to(device_type)
+        #of_output.sum().backward()
+
+        assert np.allclose(of_output.numpy(), tf_output.numpy(), rtol=1e-03, atol=1e-04)
+        # assert np.allclose(
+        #     of_logits.grad.numpy(), tf_logits_diff.numpy(), rtol=1e-03, atol=1e-04
+        # )
 
 class TestSparseSoftmaxCrossEntropyWithLogitsGrid(flow.unittest.TestCase):
     def test_sparse_softmax_cross_entropy_with_logits(test_case):
@@ -65,7 +79,7 @@ class TestSparseSoftmaxCrossEntropyWithLogitsGrid(flow.unittest.TestCase):
 
         logits = flow.tensor(np_logits, dtype=flow.float32)
         labels = flow.tensor(np_labels, dtype=flow.int32)
-        output = flow.nn.functional.sparse_softmax_cross_entropy_with_logits(
+        output = flow.nn.functional.distributed_sparse_softmax_cross_entropy(
             labels=labels, logits=logits
         )
 

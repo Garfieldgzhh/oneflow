@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+#include <cstdint>
 #include "oneflow/core/common/optional.h"
 #include "oneflow/core/common/scalar.h"
 #include "oneflow/core/framework/attr_map.h"
@@ -356,6 +357,28 @@ class AdaptiveAvgPool3DFunctor : public AdaptivePoolNDFunctor {
   }
 };
 
+class DistributedSparseCrossEntropyFunctor {
+ public:
+  DistributedSparseCrossEntropyFunctor() {
+    op_ = CHECK_JUST(one::OpBuilder("sparse_cross_entropy_ms")
+                         .Input("prediction")
+                         .Input("label")
+                         .Output("out")
+                         .Build());
+  }
+  Maybe<Tensor> operator()(const std::shared_ptr<one::Tensor>& prediction,
+                                const std::shared_ptr<one::Tensor>& label,
+                                const int64_t& depth) const {
+    MutableAttrMap attrs;
+    JUST(attrs.SetAttr<int64_t>("depth", depth));
+
+    return OpInterpUtil::Dispatch<Tensor>(*op_, {prediction, label}, attrs);
+  }
+
+ private:
+  std::shared_ptr<OpExpr> op_;
+};
+
 class SparseSoftmaxCrossEntropyFunctor {
  public:
   SparseSoftmaxCrossEntropyFunctor() {
@@ -376,6 +399,96 @@ class SparseSoftmaxCrossEntropyFunctor {
 
  private:
   std::shared_ptr<OpExpr> op_;
+};
+
+class DistributedSparseSoftmaxCrossEntropyFunctor {
+ public:
+  DistributedSparseSoftmaxCrossEntropyFunctor() {
+    op_reduce_max_device_stage_ = CHECK_JUST(one::OpBuilder("reduce_max_device_stage")
+                         .Input("in")
+                         .Output("out")
+                         .Output("mask")
+                         .Output("count")
+                         .Build());
+    op_reduce_max_global_stage_ = CHECK_JUST(one::OpBuilder("reduce_max_global_stage")
+                        .Input("in")
+                        .Input("device_count")
+                        .Output("out")
+                        .Output("mask")
+                        .Build());
+    op_broadcast_sub_ = CHECK_JUST(one::OpBuilder("broadcast_sub")
+                        .Input("x")
+                        .Input("y")
+                        .Output("z")
+                        .Build());
+    op_exp_ = CHECK_JUST(one::OpBuilder("exp")
+                        .Input("x")
+                        .Output("y")
+                        .Build());
+    op_reduce_sum_ = CHECK_JUST(one::OpBuilder("reduce_sum")
+                        .Input("input_tensor")
+                        .Output("output_tensor")
+                        .Build());
+    op_broadcast_div_ = CHECK_JUST(one::OpBuilder("broadcast_div")
+                        .Input("x")
+                        .Input("y")
+                        .Output("z")
+                        .Build());
+    op_sparse_cross_entropy_ms_ = CHECK_JUST(one::OpBuilder("sparse_cross_entropy_ms")
+                        .Input("prediction")
+                        .Input("label")
+                        .Output("out")
+                        .Build());
+  }
+  Maybe<TensorTuple> operator()(const std::shared_ptr<one::Tensor>& logits,
+                                const std::shared_ptr<one::Tensor>& label) const {
+    MutableAttrMap attrs;
+    int64_t depth = logits->shape()->At(logits->shape()->NumAxes() - 1);
+    int32_t aixs = logits->shape()->NumAxes() - 1;
+
+    JUST(attrs.SetAttr<std::vector<int32_t>>("aixs", {aixs}));
+    const auto& output_reduce_max_device_stage
+      = JUST(OpInterpUtil::Dispatch<TensorTuple>(*op_reduce_max_device_stage_, {logits}, attrs));
+
+    attrs.clear();
+    JUST(attrs.SetAttr<std::vector<int32_t>>("axis", {aixs}));
+    JUST(attrs.SetAttr<bool>("keepdims", true));
+    const auto& output_reduce_max_global_stage
+      = JUST(OpInterpUtil::Dispatch<TensorTuple>(*op_reduce_max_global_stage_, {output_reduce_max_device_stage->at(0), output_reduce_max_device_stage->at(2)}, attrs));
+
+    attrs.clear();
+    const auto& output_broadcast_sub
+      = JUST(OpInterpUtil::Dispatch<TensorTuple>(*op_broadcast_sub_, {logits, output_reduce_max_global_stage->at(0)}, attrs));
+
+    const auto& output_exp
+      = JUST(OpInterpUtil::Dispatch<TensorTuple>(*op_exp_, {output_broadcast_sub->at(0)}, attrs));
+
+    JUST(attrs.SetAttr<std::vector<int32_t>>("axis", {aixs}));
+    JUST(attrs.SetAttr<bool>("keepdims", true));
+    const auto& output_reduce_sum
+      = JUST(OpInterpUtil::Dispatch<TensorTuple>(*op_reduce_sum_, {output_exp->at(0)}, attrs));
+
+    attrs.clear();
+    const auto& output_broadcast_div
+      = JUST(OpInterpUtil::Dispatch<TensorTuple>(*op_broadcast_div_, {output_exp->at(0), output_reduce_sum->at(0)}, attrs));
+
+    JUST(attrs.SetAttr<int64_t>("depth", depth));
+    const auto& output_sparse_cross_entropy_ms
+      = JUST(OpInterpUtil::Dispatch<Tensor>(*op_sparse_cross_entropy_ms_, {output_broadcast_div->at(0), label}, attrs));
+
+    const TensorTuple result = {output_broadcast_div->at(0), output_sparse_cross_entropy_ms};
+
+    return result;
+  }
+
+ private:
+  std::shared_ptr<OpExpr> op_reduce_max_device_stage_;
+  std::shared_ptr<OpExpr> op_reduce_max_global_stage_;
+  std::shared_ptr<OpExpr> op_broadcast_sub_;
+  std::shared_ptr<OpExpr> op_exp_;
+  std::shared_ptr<OpExpr> op_reduce_sum_;
+  std::shared_ptr<OpExpr> op_broadcast_div_;
+  std::shared_ptr<OpExpr> op_sparse_cross_entropy_ms_;
 };
 
 class SoftmaxCrossEntropyFunctor {
@@ -1170,7 +1283,9 @@ ONEFLOW_FUNCTION_LIBRARY(m) {
   m.add_functor<impl::AdaptiveAvgPool1DFunctor>("AdaptiveAvgPool1D");
   m.add_functor<impl::AdaptiveAvgPool2DFunctor>("AdaptiveAvgPool2D");
   m.add_functor<impl::AdaptiveAvgPool3DFunctor>("AdaptiveAvgPool3D");
+  m.add_functor<impl::DistributedSparseCrossEntropyFunctor>("DistributedSparseCrossEntropy");
   m.add_functor<impl::SparseSoftmaxCrossEntropyFunctor>("SparseSoftmaxCrossEntropy");
+  m.add_functor<impl::DistributedSparseSoftmaxCrossEntropyFunctor>("DistributedSparseSoftmaxCrossEntropy");
   m.add_functor<impl::SoftmaxCrossEntropyFunctor>("SoftmaxCrossEntropy");
   m.add_functor<impl::SoftmaxCrossEntropyGradFunctor>("SoftmaxCrossEntropyGrad");
   m.add_functor<impl::SmoothL1LossFunctor>("SmoothL1Loss");

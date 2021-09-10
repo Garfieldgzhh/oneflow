@@ -159,6 +159,38 @@
   signature: "Tensor (Tensor x, Int32List axis, Bool keepdims=False) => ReduceProd"
   bind_python: True
 
+- name: "reduce_min_device_stage"
+  signature: "TensorTuple (Tensor in, Int32List axis) => ReduceMinDeviceStage"
+  bind_python: True
+
+- name: "reduce_min_device_stage_grad"
+  signature: "Tensor (Tensor out_diff, Tensor mask, Tensor count, Int32List axis) => ReduceMinDeviceStageGrad"
+  bind_python: False
+
+- name: "reduce_max_device_stage"
+  signature: "TensorTuple (Tensor in, Int32List axis) => ReduceMaxDeviceStage"
+  bind_python: True
+
+- name: "reduce_max_device_stage_grad"
+  signature: "Tensor (Tensor out_diff, Tensor mask, Tensor count, Int32List axis) => ReduceMaxDeviceStageGrad"
+  bind_python: False
+
+- name: "reduce_min_global_stage"
+  signature: "TensorTuple (Tensor in, Tensor device_count, Int32List axis, Bool keepdims=False) => ReduceMinGlobalStage"
+  bind_python: True
+
+- name: "reduce_min_global_stage_grad"
+  signature: "Tensor (Tensor out_diff, Tensor mask, Tensor device_count, Int32List axis, Bool keepdims=False) => ReduceMinGlobalStageGrad"
+  bind_python: False
+
+- name: "reduce_max_global_stage"
+  signature: "TensorTuple (Tensor in, Tensor device_count, Int32List axis, Bool keepdims=False) => ReduceMaxGlobalStage"
+  bind_python: True
+
+- name: "reduce_max_global_stage_grad"
+  signature: "Tensor (Tensor out_diff, Tensor mask, Tensor device_count, Int32List axis, Bool keepdims=False) => ReduceMaxGlobalStageGrad"
+  bind_python: False
+
 - name: "transpose"
   signature: "Tensor (Tensor x, Int32List perm) => Transpose"
   bind_python: True
@@ -517,8 +549,20 @@
     Double alpha=1.0) => BatchMatMul"
   bind_python: True
 
+- name: "distributed_sparse_cross_entropy"
+  signature: "Tensor (Tensor prediction, Tensor label, Int64 depth) => DistributedSparseCrossEntropy"
+  bind_python: True
+
+- name: "distributed_sparse_cross_entropy_grad"
+  signature: "Tensor (Tensor prediction, Tensor label, Tensor dy, Int64 depth) => DistributedSparseCrossEntropyGrad"
+  bind_python: False
+
 - name: "sparse_softmax_cross_entropy"
   signature: "TensorTuple (Tensor logits, Tensor label) => SparseSoftmaxCrossEntropy"
+  bind_python: True
+
+- name: "distributed_sparse_softmax_cross_entropy"
+  signature: "TensorTuple (Tensor logits, Tensor label) => DistributedSparseSoftmaxCrossEntropy"
   bind_python: True
 
 - name: "softmax_cross_entropy"

@@ -91,6 +91,9 @@ def sparse_softmax_cross_entropy_with_logits(labels, logits):
     (_, out) = flow._C.sparse_softmax_cross_entropy(logits, labels)
     return out
 
+def distributed_sparse_softmax_cross_entropy_with_logits(labels, logits):
+    (_, out) = flow._C.distributed_sparse_softmax_cross_entropy(logits, labels)
+    return out
 
 if __name__ == "__main__":
     import doctest

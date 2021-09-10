@@ -20,6 +20,9 @@ from oneflow.nn.modules.grid_sample import grid_sample
 from oneflow.nn.modules.sparse_softmax_cross_entropy_with_logits import (
     sparse_softmax_cross_entropy_with_logits,
 )
+from oneflow.nn.modules.sparse_softmax_cross_entropy_with_logits import (
+    distributed_sparse_softmax_cross_entropy_with_logits,
+)
 from oneflow._C import conv1d
 from oneflow._C import conv2d
 from oneflow._C import conv3d
